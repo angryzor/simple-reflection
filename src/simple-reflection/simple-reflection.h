@@ -19,21 +19,12 @@ namespace simplerfl {
         constexpr operator std::string_view() const { return std::string_view(std::data(buffer), N - 1); }
     };
 
-    enum class DescType {
-        PRIMITIVE,
-        STRUCTURE,
-        POINTER,
-        DYNAMIC,
-        DYNAMIC_SELF,
-        DYNAMIC_CARRAY,
-        STATIC_CARRAY,
+    template<size_t descType> struct decl {
+        static constexpr size_t desc_type = descType;
     };
 
-    template<DescType descType> struct decl {
-        static constexpr DescType desc_type = descType;
-    };
-
-    template<typename Repr> struct primitive : decl<DescType::PRIMITIVE> {
+    static constexpr size_t DESCTYPE_PRIMITIVE = 0x5052494D54495645;
+    template<typename Repr> struct primitive : decl<DESCTYPE_PRIMITIVE> {
         using repr = Repr;
     };
 
@@ -54,7 +45,8 @@ namespace simplerfl {
         static constexpr strlit name = name;
     };
 
-    template<typename Repr, strlit name, typename Base, typename... Fields> struct structure : decl<DescType::STRUCTURE> {
+    static constexpr size_t DESCTYPE_STRUCTURE = 0x5354525543545245;
+    template<typename Repr, strlit name, typename Base, typename... Fields> struct structure : decl<DESCTYPE_STRUCTURE> {
         using repr = Repr;
         static constexpr strlit name = name;
         using base = resolve_decl_t<Base>;
@@ -64,27 +56,32 @@ namespace simplerfl {
     template<typename Type> using dynamic_resolver = size_t (*) (const Type& parent);
     template<typename Parent> using array_size_resolver = size_t (*) (const Parent& parent);
 
-    template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct dynamic : decl<DescType::DYNAMIC> {
+    static constexpr size_t DESCTYPE_DYNAMIC = 0x44594E414D494330;
+    template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct dynamic : decl<DESCTYPE_DYNAMIC> {
         static constexpr dynamic_resolver<Parent> resolver = resolver;
         using types = std::tuple<Types...>;
     };
 
-    template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct dynamic_self : decl<DescType::DYNAMIC_SELF> {
+    static constexpr size_t DESCTYPE_DYNAMIC_SELF = 0x44594E414D494353;
+    template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct dynamic_self : decl<DESCTYPE_DYNAMIC_SELF> {
         static constexpr dynamic_resolver<Base> resolver = resolver;
         using types = std::tuple<Types...>;
     };
 
-    template<typename Type> struct pointer : decl<DescType::POINTER> {
+    static constexpr size_t DESCTYPE_POINTER = 0x504F494E54455230;
+    template<typename Type> struct pointer : decl<DESCTYPE_POINTER> {
         using target = resolve_decl_t<Type>;
     };
 
-    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct dynamic_carray : decl<DescType::DYNAMIC_CARRAY> {
+    static constexpr size_t DESCTYPE_DYNAMIC_CARRAY = 0x44594E4143415252;
+    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct dynamic_carray : decl<DESCTYPE_DYNAMIC_CARRAY> {
         using type = resolve_decl_t<Type>;
         using parent = Parent;
         static constexpr array_size_resolver<Parent> resolver = resolver;
     };
 
-    template<typename Type, size_t size> struct static_carray : decl<DescType::STATIC_CARRAY> {
+    static constexpr size_t DESCTYPE_STATIC_CARRAY = 0x5354415443415252;
+    template<typename Type, size_t size> struct static_carray : decl<DESCTYPE_STATIC_CARRAY> {
         using type = resolve_decl_t<Type>;
         static constexpr size_t size = size;
     };
@@ -126,13 +123,13 @@ namespace simplerfl {
     template<typename Type> struct align_of { static constexpr size_t value = alignof(representation_t<Type>); };
     template<size_t alignment, typename Type> struct align_of<aligned<alignment, Type>> { static constexpr size_t value = alignment; };
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct align_of<dynamic_carray<Type, Parent, resolver>> {
-        static constexpr size_t value = size_of<typename dynamic_carray<Type, Parent, resolver>::type>::value;
+        static constexpr size_t value = align_of<typename dynamic_carray<Type, Parent, resolver>::type>::value;
     };
     template<typename Type> constexpr size_t align_of_v = align_of<Type>::value;
 
     template<typename Type>
     size_t dynamic_size_of(void* parent, void* self) {
-        if constexpr (desugar_t<Type>::desc_type == DescType::DYNAMIC_CARRAY)
+        if constexpr (desugar_t<Type>::desc_type == DESCTYPE_DYNAMIC_CARRAY)
             return desugar_t<Type>::resolver(*(typename desugar_t<Type>::parent*)parent) * dynamic_size_of<typename desugar_t<Type>::type>(parent, self);
         else
             return size_of_v<Type>;

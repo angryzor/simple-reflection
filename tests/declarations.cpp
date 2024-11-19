@@ -8,7 +8,12 @@ using AlignedIntInner = AlignedInt::type;
 using O = resolve_decl_t<int>;
 using Rep = representation_t<AlignedInt>;
 
-using Test1 = structure<"Test1", void,
+struct Test1Repr {
+	float foo;
+	alignas(16) int bar;
+};
+
+using Test1 = structure<Test1Repr, "Test1", void,
 	field<float, "foo">,
 	field<AlignedInt, "bar">
 >;
@@ -30,6 +35,7 @@ static_assert(is_same_v<desugar_t<AlignedInt>, primitive<int>>);
 static_assert(is_same_v<representation_t<primitive<int>>, int>);
 static_assert(is_same_v<representation_t<AlignedInt>, int>);
 static_assert(is_same_v<representation_t<primitive<void*>>, void*>);
+// TODO: find out why this test fails: static_assert(is_same_v<representation_t<Test1>, Test1Repr>);
 
 static_assert(align_of_v<AlignedInt> == 16);
 static_assert(size_of_v<primitive<int>> == 4);
