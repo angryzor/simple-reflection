@@ -53,17 +53,47 @@ namespace simplerfl {
         using fields = std::tuple<Fields...>;
     };
 
+    template<typename Parent> using union_resolver = size_t (*) (const Parent& parent);
+    static constexpr size_t DESCTYPE_UNION = 0x554e494f4e303030;
+    template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct unionof : decl<DESCTYPE_UNION> {
+        using repr = Repr;
+        static constexpr strlit name = name;
+        using parent = Parent;
+        static constexpr union_resolver<Parent> resolver = resolver;
+        using fields = std::tuple<Fields...>;
+    };
+
+    template<strlit name> struct option {
+        static constexpr strlit name = name;
+    };
+
+    template<strlit name, long long value> struct fixed_option {
+        static constexpr strlit name = name;
+        static constexpr long long value = value;
+    };
+
+    static constexpr size_t DESCTYPE_ENUMERATION = 0x454e554d5241544e;
+    template<typename Repr, strlit name, typename Underlying, typename... Options> struct enumeration : decl<DESCTYPE_ENUMERATION> {
+        using repr = Repr;
+        static constexpr strlit name = name;
+        using underlying = Underlying;
+        using options = std::tuple<Options...>;
+    };
+
     template<typename Type> using dynamic_resolver = size_t (*) (const Type& parent);
     template<typename Parent> using array_size_resolver = size_t (*) (const Parent& parent);
 
     static constexpr size_t DESCTYPE_DYNAMIC = 0x44594E414D494330;
     template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct dynamic : decl<DESCTYPE_DYNAMIC> {
+        using base = Base;
+        using parent = Parent;
         static constexpr dynamic_resolver<Parent> resolver = resolver;
         using types = std::tuple<Types...>;
     };
 
     static constexpr size_t DESCTYPE_DYNAMIC_SELF = 0x44594E414D494353;
     template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct dynamic_self : decl<DESCTYPE_DYNAMIC_SELF> {
+        using base = Base;
         static constexpr dynamic_resolver<Base> resolver = resolver;
         using types = std::tuple<Types...>;
     };
@@ -109,12 +139,14 @@ namespace simplerfl {
     template<typename Type> using representation_t = typename representation<Type>::type;
 
     template<typename Repr> struct representation_of_type<primitive<Repr>> { using type = Repr; };
+    template<typename Repr, strlit name, typename Underlying, typename... Options> struct representation_of_type<enumeration<Repr, name, Underlying, Options...>> { using type = typename Repr; };
     template<typename Type> struct representation_of_type<pointer<Type>> { using type = typename representation_t<Type>*; };
     template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct representation_of_type<dynamic<Base, Parent, resolver, Types...>> { using type = Base; };
     template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct representation_of_type<dynamic_self<Base, resolver, Types...>> { using type = Base; };
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct representation_of_type<dynamic_carray<Type, Parent, resolver>> { using type = Type[]; };
     template<typename Type, size_t size> struct representation_of_type<static_carray<Type, size>> { using type = Type[size]; };
     template<typename Repr, strlit name, typename Base, typename... Fields> struct representation_of_type<structure<Repr, name, Base, Fields...>> { using type = Repr; };
+    template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct representation_of_type<unionof<Repr, name, Parent, resolver, Fields...>> { using type = Repr; };
 
     template<typename Type> struct size_of { static constexpr size_t value = sizeof(representation_t<Type>); };
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct size_of<dynamic_carray<Type, Parent, resolver>> { static_assert("Cannot take size of a dynamic array!"); };
