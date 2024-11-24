@@ -136,6 +136,7 @@ namespace simplerfl {
     template<typename T> struct canonical<T*> { using type = pointer<canonical_t<T>>; };
     template<> struct canonical<const char*> { using type = primitive<const char*>; };
     template<> struct canonical<void*> { using type = primitive<void*>; };
+    template<typename T, size_t length> struct canonical<T[length]> { using type = static_carray<T, length>; };
 
     template<typename Type> struct desugar { using type = Type; };
     template<size_t alignment, typename Type> struct desugar<aligned<alignment, Type>> { using type = typename desugar<typename aligned<alignment, Type>::type>::type; };
