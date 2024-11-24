@@ -14,8 +14,8 @@ namespace simplerfl {
         constexpr strlit(const std::array<char, N> buffer) : buffer{ buffer } {}
         constexpr strlit(const char(&str)[N]) { std::copy_n(str, N, std::data(buffer)); }
 
-        operator const char* () const { return std::data(buffer); }
-        operator std::string() const { return std::string(std::data(buffer), N - 1); }
+        constexpr operator const char* () const { return std::data(buffer); }
+        constexpr operator std::string() const { return std::string(std::data(buffer), N - 1); }
         constexpr operator std::string_view() const { return std::string_view(std::data(buffer), N - 1); }
     };
 
@@ -120,6 +120,15 @@ namespace simplerfl {
         static constexpr size_t alignment = alignment;
         using type = resolve_decl_t<Type>;
     };
+
+    template<typename Type> struct is_realigned { static constexpr bool value = is_realigned<Type::type>::value; };
+    template<typename T> struct is_realigned<simplerfl::primitive<T>> { static constexpr bool value = false; };
+    template<typename Repr, simplerfl::strlit name, typename Underlying, typename... Options> struct is_realigned<simplerfl::enumeration<Repr, name, Underlying, Options...>> { static constexpr bool value = false; };
+    template<typename T> struct is_realigned<simplerfl::pointer<T>> { static constexpr bool value = false; };
+    template<typename Repr, simplerfl::strlit name, typename Base, typename... Fields> struct is_realigned<simplerfl::structure<Repr, name, Base, Fields...>> { static constexpr bool value = false; };
+    template<typename Repr, simplerfl::strlit name, typename Parent, simplerfl::union_resolver<Parent> resolver, typename... Fields> struct is_realigned<simplerfl::unionof<Repr, name, Parent, resolver, Fields...>> { static constexpr bool value = false; };
+    template<size_t alignment, typename Type> struct is_realigned<aligned<alignment, Type>> { static constexpr bool value = true; };
+    template<typename Type> static constexpr bool is_realigned_v = is_realigned<Type>::value;
 
     // Some simple canonical implementations.
     //template<typename T, size_t Len> struct canonical<T[Len]> { using type = static_carray<T, Len>; };
