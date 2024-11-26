@@ -22,6 +22,10 @@ namespace simplerfl {
     template<size_t descType> struct decl {
         static constexpr size_t desc_type = descType;
     };
+    struct mod_base {};
+    template<size_t modId> struct mod : mod_base {
+        static constexpr size_t mod_id = modId;
+    };
 
     static constexpr size_t DESCTYPE_PRIMITIVE = 0x5052494D54495645;
     template<typename Repr> struct primitive : decl<DESCTYPE_PRIMITIVE> {
@@ -116,7 +120,8 @@ namespace simplerfl {
         static constexpr size_t size = size;
     };
 
-    template<size_t alignment, typename Type> struct aligned {
+    static constexpr size_t MOD_ALIGNED = 0x414c49474e454430;
+    template<size_t alignment, typename Type> struct aligned : mod<MOD_ALIGNED> {
         static constexpr size_t alignment = alignment;
         using type = resolve_decl_t<Type>;
     };
@@ -138,35 +143,43 @@ namespace simplerfl {
     template<> struct canonical<void*> { using type = primitive<void*>; };
     template<typename T, size_t length> struct canonical<T[length]> { using type = static_carray<T, length>; };
 
-    template<typename Type> struct desugar { using type = Type; };
-    template<size_t alignment, typename Type> struct desugar<aligned<alignment, Type>> { using type = typename desugar<typename aligned<alignment, Type>::type>::type; };
+    template<typename Type> static constexpr bool is_modifier_v = std::is_base_of_v<mod_base, Type>;
+
+    template<size_t mod_id, typename Type, bool = is_modifier_v<Type>> struct has_modifier;
+    template<size_t mod_id, typename Type> struct has_modifier<mod_id, Type, true> { static constexpr bool value = Type::mod_id == mod_id || has_modifier<mod_id, typename Type::type>::value; };
+    template<size_t mod_id, typename Type> struct has_modifier<mod_id, Type, false> { static constexpr bool value = false; };
+    template<size_t mod_id, typename Type> static constexpr bool has_modifier_v = has_modifier<mod_id, Type>::value;
+
+    //template<size_t mod_id, typename Type, bool = is_modifier_v<Type>> struct get_modifier;
+    //template<size_t mod_id, typename Type> struct get_modifier<mod_id, Type, true> { using type = std::conditional_t<Type::mod_id == mod_id, >; };
+    //template<size_t mod_id, typename Type> struct get_modifier<mod_id, Type, false> { using type = void; };
+    //template<size_t mod_id, typename Type> using get_modifier_t = get_modifier<mod_id, Type>::type;
+
+    template<typename Type, bool = is_modifier_v<Type>> struct desugar;
+    template<typename Type> struct desugar<Type, true> { using type = typename desugar<typename Type::type>::type; };
+    template<typename Type> struct desugar<Type, false> { using type = Type; };
     template<typename Type> using desugar_t = desugar<Type>::type;
 
-    template<typename Type> struct representation_of_type { static_assert("Attempt to get representation_of_type of invalid reflection description."); };
-    template<typename Type> using representation_of_type_t = typename representation_of_type<Type>::type;
-
-    template<typename Type> struct representation { using type = representation_of_type_t<desugar_t<Type>>; };
+    template<typename Type> struct representation;
     template<typename Type> using representation_t = typename representation<Type>::type;
 
-    template<typename Repr> struct representation_of_type<primitive<Repr>> { using type = Repr; };
-    template<typename Repr, strlit name, typename Underlying, typename... Options> struct representation_of_type<enumeration<Repr, name, Underlying, Options...>> { using type = typename Repr; };
-    template<typename Type> struct representation_of_type<pointer<Type>> { using type = typename representation_t<Type>*; };
-    template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct representation_of_type<dynamic<Base, Parent, resolver, Types...>> { using type = Base; };
-    template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct representation_of_type<dynamic_self<Base, resolver, Types...>> { using type = Base; };
-    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct representation_of_type<dynamic_carray<Type, Parent, resolver>> { using type = Type[]; };
-    template<typename Type, size_t size> struct representation_of_type<static_carray<Type, size>> { using type = Type[size]; };
-    template<typename Repr, strlit name, typename Base, typename... Fields> struct representation_of_type<structure<Repr, name, Base, Fields...>> { using type = Repr; };
-    template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct representation_of_type<unionof<Repr, name, Parent, resolver, Fields...>> { using type = Repr; };
+    template<typename Repr> struct representation<primitive<Repr>> { using type = typename primitive<Repr>::repr; };
+    template<typename Repr, strlit name, typename Underlying, typename... Options> struct representation<enumeration<Repr, name, Underlying, Options...>> { using type = Repr; };
+    template<typename Type> struct representation<pointer<Type>> { using type = typename representation_t<typename pointer<Type>::target>*; };
+    template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct representation<dynamic<Base, Parent, resolver, Types...>> { using type = typename dynamic<Base, Parent, resolver, Types...>::base; };
+    template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct representation<dynamic_self<Base, resolver, Types...>> { using type = typename dynamic_self<Base, resolver, Types...>::base; };
+    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct representation<dynamic_carray<Type, Parent, resolver>> { using type = typename dynamic_carray<Type, Parent, resolver>::type[]; };
+    template<typename Type, size_t size> struct representation<static_carray<Type, size>> { using type = typename static_carray<Type, size>::type[size]; };
+    template<typename Repr, strlit name, typename Base, typename... Fields> struct representation<structure<Repr, name, Base, Fields...>> { using type = Repr; };
+    template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct representation<unionof<Repr, name, Parent, resolver, Fields...>> { using type = Repr; };
 
-    template<typename Type> struct size_of { static constexpr size_t value = sizeof(representation_t<Type>); };
+    template<typename Type> struct size_of { static constexpr size_t value = sizeof(representation_t<desugar_t<Type>>); };
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct size_of<dynamic_carray<Type, Parent, resolver>> { static_assert("Cannot take size of a dynamic array!"); };
     template<typename Type> constexpr size_t size_of_v = size_of<Type>::value;
 
-    template<typename Type> struct align_of { static constexpr size_t value = alignof(representation_t<Type>); };
+    template<typename Type> struct align_of { static constexpr size_t value = alignof(representation_t<desugar_t<Type>>); };
     template<size_t alignment, typename Type> struct align_of<aligned<alignment, Type>> { static constexpr size_t value = alignment; };
-    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct align_of<dynamic_carray<Type, Parent, resolver>> {
-        static constexpr size_t value = align_of<typename dynamic_carray<Type, Parent, resolver>::type>::value;
-    };
+    template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct align_of<dynamic_carray<Type, Parent, resolver>> { static constexpr size_t value = align_of<typename dynamic_carray<Type, Parent, resolver>::type>::value; }; // TODO: Fix this. currently only works when top level.
     template<typename Type> constexpr size_t align_of_v = align_of<Type>::value;
 
     template<typename Type>
