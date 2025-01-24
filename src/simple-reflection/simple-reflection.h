@@ -19,15 +19,15 @@ namespace simplerfl {
         constexpr operator std::string_view() const { return std::string_view(std::data(buffer), N - 1); }
     };
 
-    template<size_t descType> struct decl {
-        static constexpr size_t desc_type = descType;
+    template<unsigned long long descType> struct decl {
+        static constexpr unsigned long long desc_type = descType;
     };
     struct mod_base {};
-    template<size_t modId> struct mod : mod_base {
-        static constexpr size_t mod_id = modId;
+    template<unsigned long long modId> struct mod : mod_base {
+        static constexpr unsigned long long mod_id = modId;
     };
 
-    static constexpr size_t DESCTYPE_PRIMITIVE = 0x5052494D54495645;
+    static constexpr unsigned long long DESCTYPE_PRIMITIVE = 0x5052494D54495645;
     template<typename Repr> struct primitive : decl<DESCTYPE_PRIMITIVE> {
         using repr = Repr;
     };
@@ -49,7 +49,7 @@ namespace simplerfl {
         static constexpr strlit name = name;
     };
 
-    static constexpr size_t DESCTYPE_STRUCTURE = 0x5354525543545245;
+    static constexpr unsigned long long DESCTYPE_STRUCTURE = 0x5354525543545245;
     template<typename Repr, strlit name, typename Base, typename... Fields> struct structure : decl<DESCTYPE_STRUCTURE> {
         using repr = Repr;
         static constexpr strlit name = name;
@@ -58,7 +58,7 @@ namespace simplerfl {
     };
 
     template<typename Parent> using union_resolver = size_t (*) (const Parent& parent);
-    static constexpr size_t DESCTYPE_UNION = 0x554e494f4e303030;
+    static constexpr unsigned long long DESCTYPE_UNION = 0x554e494f4e303030;
     template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct unionof : decl<DESCTYPE_UNION> {
         using repr = Repr;
         static constexpr strlit name = name;
@@ -71,12 +71,12 @@ namespace simplerfl {
         static constexpr strlit name = name;
     };
 
-    template<strlit name, long long value> struct fixed_option {
+    template<strlit name, unsigned long long value> struct fixed_option {
         static constexpr strlit name = name;
-        static constexpr long long value = value;
+        static constexpr unsigned long long value = value;
     };
 
-    static constexpr size_t DESCTYPE_ENUMERATION = 0x454e554d5241544e;
+    static constexpr unsigned long long DESCTYPE_ENUMERATION = 0x454e554d5241544e;
     template<typename Repr, strlit name, typename Underlying, typename... Options> struct enumeration : decl<DESCTYPE_ENUMERATION> {
         using repr = Repr;
         static constexpr strlit name = name;
@@ -87,7 +87,7 @@ namespace simplerfl {
     template<typename Type> using dynamic_resolver = size_t (*) (const Type& parent);
     template<typename Parent> using array_size_resolver = size_t (*) (const Parent& parent);
 
-    static constexpr size_t DESCTYPE_DYNAMIC = 0x44594E414D494330;
+    static constexpr unsigned long long DESCTYPE_DYNAMIC = 0x44594E414D494330;
     template<typename Base, typename Parent, dynamic_resolver<Parent> resolver, typename... Types> struct dynamic : decl<DESCTYPE_DYNAMIC> {
         using base = Base;
         using parent = Parent;
@@ -95,32 +95,32 @@ namespace simplerfl {
         using types = std::tuple<Types...>;
     };
 
-    static constexpr size_t DESCTYPE_DYNAMIC_SELF = 0x44594E414D494353;
+    static constexpr unsigned long long DESCTYPE_DYNAMIC_SELF = 0x44594E414D494353;
     template<typename Base, dynamic_resolver<Base> resolver, typename... Types> struct dynamic_self : decl<DESCTYPE_DYNAMIC_SELF> {
         using base = Base;
         static constexpr dynamic_resolver<Base> resolver = resolver;
         using types = std::tuple<Types...>;
     };
 
-    static constexpr size_t DESCTYPE_POINTER = 0x504F494E54455230;
+    static constexpr unsigned long long DESCTYPE_POINTER = 0x504F494E54455230;
     template<typename Type> struct pointer : decl<DESCTYPE_POINTER> {
         using target = resolve_decl_t<Type>;
     };
 
-    static constexpr size_t DESCTYPE_DYNAMIC_CARRAY = 0x44594E4143415252;
+    static constexpr unsigned long long DESCTYPE_DYNAMIC_CARRAY = 0x44594E4143415252;
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct dynamic_carray : decl<DESCTYPE_DYNAMIC_CARRAY> {
         using type = resolve_decl_t<Type>;
         using parent = Parent;
         static constexpr array_size_resolver<Parent> resolver = resolver;
     };
 
-    static constexpr size_t DESCTYPE_STATIC_CARRAY = 0x5354415443415252;
+    static constexpr unsigned long long DESCTYPE_STATIC_CARRAY = 0x5354415443415252;
     template<typename Type, size_t size> struct static_carray : decl<DESCTYPE_STATIC_CARRAY> {
         using type = resolve_decl_t<Type>;
         static constexpr size_t size = size;
     };
 
-    static constexpr size_t MOD_ALIGNED = 0x414c49474e454430;
+    static constexpr unsigned long long MOD_ALIGNED = 0x414c49474e454430;
     template<size_t alignment, typename Type> struct aligned : mod<MOD_ALIGNED> {
         static constexpr size_t alignment = alignment;
         using type = resolve_decl_t<Type>;
@@ -145,15 +145,15 @@ namespace simplerfl {
 
     template<typename Type> static constexpr bool is_modifier_v = std::is_base_of_v<mod_base, Type>;
 
-    template<size_t mod_id, typename Type, bool = is_modifier_v<Type>> struct has_modifier;
-    template<size_t mod_id, typename Type> struct has_modifier<mod_id, Type, true> { static constexpr bool value = Type::mod_id == mod_id || has_modifier<mod_id, typename Type::type>::value; };
-    template<size_t mod_id, typename Type> struct has_modifier<mod_id, Type, false> { static constexpr bool value = false; };
-    template<size_t mod_id, typename Type> static constexpr bool has_modifier_v = has_modifier<mod_id, Type>::value;
+    template<unsigned long long mod_id, typename Type, bool = is_modifier_v<Type>> struct has_modifier;
+    template<unsigned long long mod_id, typename Type> struct has_modifier<mod_id, Type, true> { static constexpr bool value = Type::mod_id == mod_id || has_modifier<mod_id, typename Type::type>::value; };
+    template<unsigned long long mod_id, typename Type> struct has_modifier<mod_id, Type, false> { static constexpr bool value = false; };
+    template<unsigned long long mod_id, typename Type> static constexpr bool has_modifier_v = has_modifier<mod_id, Type>::value;
 
-    //template<size_t mod_id, typename Type, bool = is_modifier_v<Type>> struct get_modifier;
-    //template<size_t mod_id, typename Type> struct get_modifier<mod_id, Type, true> { using type = std::conditional_t<Type::mod_id == mod_id, >; };
-    //template<size_t mod_id, typename Type> struct get_modifier<mod_id, Type, false> { using type = void; };
-    //template<size_t mod_id, typename Type> using get_modifier_t = get_modifier<mod_id, Type>::type;
+    //template<unsigned long long mod_id, typename Type, bool = is_modifier_v<Type>> struct get_modifier;
+    //template<unsigned long long mod_id, typename Type> struct get_modifier<mod_id, Type, true> { using type = std::conditional_t<Type::mod_id == mod_id, >; };
+    //template<unsigned long long mod_id, typename Type> struct get_modifier<mod_id, Type, false> { using type = void; };
+    //template<unsigned long long mod_id, typename Type> using get_modifier_t = get_modifier<mod_id, Type>::type;
 
     template<typename Type, bool = is_modifier_v<Type>> struct desugar;
     template<typename Type> struct desugar<Type, true> { using type = typename desugar<typename Type::type>::type; };

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(simple-reflection VERSION 1.0.1
+project(simple-reflection VERSION 1.0.2
                  DESCRIPTION "Simple reflection library"
                  LANGUAGES CXX)
 
