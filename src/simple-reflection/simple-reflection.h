@@ -120,6 +120,11 @@ namespace simplerfl {
         static constexpr size_t size = size;
     };
 
+    static constexpr unsigned long long DESCTYPE_DEFERRED = 0x4445464552524544;
+    template<typename Type> struct deferred : decl<DESCTYPE_DEFERRED> {
+        using unresolved_type = Type;
+    };
+
     static constexpr unsigned long long MOD_ALIGNED = 0x414c49474e454430;
     template<size_t alignment, typename Type> struct aligned : mod<MOD_ALIGNED> {
         static constexpr size_t alignment = alignment;
@@ -133,6 +138,7 @@ namespace simplerfl {
     template<typename Repr, simplerfl::strlit name, typename Base, typename... Fields> struct is_realigned<simplerfl::structure<Repr, name, Base, Fields...>> { static constexpr bool value = false; };
     template<typename Repr, simplerfl::strlit name, typename Parent, simplerfl::union_resolver<Parent> resolver, typename... Fields> struct is_realigned<simplerfl::unionof<Repr, name, Parent, resolver, Fields...>> { static constexpr bool value = false; };
     template<size_t alignment, typename Type> struct is_realigned<aligned<alignment, Type>> { static constexpr bool value = true; };
+    template<typename Type> struct is_realigned<deferred<Type>> { static constexpr bool value = false; };
     template<typename Type> static constexpr bool is_realigned_v = is_realigned<Type>::value;
 
     // Some simple canonical implementations.
@@ -157,6 +163,7 @@ namespace simplerfl {
 
     template<typename Type, bool = is_modifier_v<Type>> struct desugar;
     template<typename Type> struct desugar<Type, true> { using type = typename desugar<typename Type::type>::type; };
+    template<typename Type> struct desugar<deferred<Type>, false> { using type = resolve_decl_t<typename deferred<Type>::unresolved_type>; };
     template<typename Type> struct desugar<Type, false> { using type = Type; };
     template<typename Type> using desugar_t = desugar<Type>::type;
 
@@ -172,6 +179,7 @@ namespace simplerfl {
     template<typename Type, size_t size> struct representation<static_carray<Type, size>> { using type = typename static_carray<Type, size>::type[size]; };
     template<typename Repr, strlit name, typename Base, typename... Fields> struct representation<structure<Repr, name, Base, Fields...>> { using type = Repr; };
     template<typename Repr, strlit name, typename Parent, union_resolver<Parent> resolver, typename... Fields> struct representation<unionof<Repr, name, Parent, resolver, Fields...>> { using type = Repr; };
+    template<typename Type> struct representation<deferred<Type>> { using type = typename representation<resolve_decl_t<typename deferred<Type>::unresolved_type>>::type; };
 
     template<typename Type> struct size_of { static constexpr size_t value = sizeof(representation_t<desugar_t<Type>>); };
     template<typename Type, typename Parent, array_size_resolver<Parent> resolver> struct size_of<dynamic_carray<Type, Parent, resolver>> { static_assert("Cannot take size of a dynamic array!"); };
